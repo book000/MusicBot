@@ -42,6 +42,9 @@ from .json import Json
 from .constants import VERSION as BOTVERSION
 from .constants import DISCORD_MSG_CHAR_LIMIT, AUDIO_CACHE_PATH
 
+# book000/MusicBot Lyrics
+import urllib
+import xml.etree.ElementTree as ET
 
 load_opus_lib()
 
@@ -481,6 +484,120 @@ class MusicBot(discord.Client):
             else:
                 newmsg = 'Now playing in `%s`: `%s` added by `%s`' % (
                     player.voice_client.channel.name, entry.title, entry.meta['author'].name)
+                    
+            # book000/MusicBot getLyrics
+            song_url = entry.url
+            log.debug("URL: " + entry.url + " (" + urllib.parse.urlparse(song_url).netloc + ")")
+            if urllib.parse.urlparse(song_url).netloc == "www.youtube.com":
+                log.debug("NETLOC: www.youtube.com")
+                d = re.search("v=(.+)", urllib.parse.urlparse(song_url).query)
+                vid = d.group(1)
+                log.debug("VID: " + vid)
+
+                message_lyrics = ""
+                Lyrics_type = ""
+
+                try:
+                    req = urllib.request.Request("http://video.google.com/timedtext?lang=ja&v=" + vid)
+                    with urllib.request.urlopen(req) as response:
+                        XmlData = response.read()
+                        if not XmlData:
+                            log.debug("日本語歌詞なし")
+                            req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                            with urllib.request.urlopen(req_en) as response_en:
+                                XmlData_en = response_en.read()
+                                if XmlData_en:
+                                    log.debug("英語歌詞あり")
+                                    root = ET.fromstring(XmlData_en)
+                                    Lyrics_type = "英語"
+                                    for transcript in root:
+                                        message_lyrics = message_lyrics + "\n" + transcript.text
+                                else:
+                                    log.debug("英語歌詞なし")
+                        else:
+                            log.debug("日本語歌詞あり")
+                            root = ET.fromstring(XmlData)
+                            Lyrics_type = "日本語"
+                            for transcript in root:
+                                message_lyrics = message_lyrics + "\n" + transcript.text
+                except urllib.error.HTTPError:
+                    log.debug("日本語歌詞なし")
+                    try:
+                        req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                        with urllib.request.urlopen(req_en) as response_en:
+                            XmlData_en = response_en.read()
+                            if XmlData_en:
+                                log.debug("英語歌詞あり")
+                                root = ET.fromstring(XmlData_en)
+                                Lyrics_type = "英語"
+                                for transcript in root:
+                                    message_lyrics = message_lyrics + "\n" + transcript.text
+                            else:
+                                log.debug("英語歌詞なし")
+                    except urllib.error.HTTPError:
+                        log.debug("英語歌詞なし")
+
+                if message_lyrics != "":
+                    # log.debug("Lyrics: %s", message_lyrics)
+                    channel = entry.meta.get('channel', None)
+                    if len(message_lyrics) >= 1900:
+                        await self.safe_send_message(channel, "__**`" + entry.title + "`歌詞字幕 (" + Lyrics_type + ")**__\n```" + message_lyrics[:1900] + "... (略)```")
+                    else:
+                        await self.safe_send_message(channel, "__**`" + entry.title + "`歌詞字幕 (" + Lyrics_type + ")**__\n```" + message_lyrics + "```")
+
+            if urllib.parse.urlparse(song_url).netloc == "youtu.be":
+                log.debug("NETLOC: youtu.be")
+                vid = urllib.parse.urlparse(song_url).path
+                log.debug("VID: " + vid)
+
+                message_lyrics = ""
+                Lyrics_type = ""
+
+                try:
+                    req = urllib.request.Request("http://video.google.com/timedtext?lang=ja&v=" + vid)
+                    with urllib.request.urlopen(req) as response:
+                        XmlData = response.read()
+                        if not XmlData:
+                            log.debug("日本語歌詞なし")
+                            req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                            with urllib.request.urlopen(req_en) as response_en:
+                                XmlData_en = response_en.read()
+                                if XmlData_en:
+                                    log.debug("英語歌詞あり")
+                                    root = ET.fromstring(XmlData_en)
+                                    Lyrics_type = "英語"
+                                    for transcript in root:
+                                        message_lyrics = message_lyrics + "\n" + transcript.text
+                                else:
+                                    log.debug("英語歌詞なし")
+                        else:
+                            log.debug("日本語歌詞あり")
+                            root = ET.fromstring(XmlData)
+                            Lyrics_type = "日本語"
+                            for transcript in root:
+                                message_lyrics = message_lyrics + "\n" + transcript.text
+                except urllib.error.HTTPError:
+                    log.debug("日本語歌詞なし")
+                    try:
+                        req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                        with urllib.request.urlopen(req_en) as response_en:
+                            XmlData_en = response_en.read()
+                            if XmlData_en:
+                                log.debug("英語歌詞あり")
+                                root = ET.fromstring(XmlData_en)
+                                Lyrics_type = "英語"
+                                for transcript in root:
+                                    message_lyrics = message_lyrics + "\n" + transcript.text
+                            else:
+                                log.debug("英語歌詞なし")
+                    except urllib.error.HTTPError:
+                        log.debug("英語歌詞なし")
+
+                if message_lyrics != "":
+                    # log.debug("Lyrics: %s", message_lyrics)
+                    channel = entry.meta.get('channel', None)
+                    await self.safe_send_message(channel, "__**`" + entry.title + "`歌詞字幕 (" + Lyrics_type + ")**__\n```" + message_lyrics + "```")
+
         else:
             # no author (and channel), it's an autoplaylist (or autostream from my other PR) entry.
             newmsg = 'Now playing automatically added entry `%s` in `%s`' % (
@@ -2556,6 +2673,133 @@ class MusicBot(discord.Client):
         await t.leave()
         return Response('Left the guild: `{0.name}` (Owner: `{0.owner.name}`, ID: `{0.id}`)'.format(t))
 
+    async def cmd_lyrics(self, player, channel, author):
+        """
+        Usage:
+            {command_prefix}loop
+
+        Activates loop mode.
+        """
+        if player.current_entry:
+            # book000/MusicBot getLyrics
+            song_url = player.current_entry.url
+            log.debug("URL: " + entry.url + " (" + urllib.parse.urlparse(song_url).netloc + ")")
+            if urllib.parse.urlparse(song_url).netloc == "www.youtube.com":
+                log.debug("NETLOC: www.youtube.com")
+                d = re.search("v=(.+)", urllib.parse.urlparse(song_url).query)
+                vid = d.group(1)
+                log.debug("VID: " + vid)
+
+                message_lyrics = ""
+                Lyrics_type = ""
+
+                try:
+                    req = urllib.request.Request("http://video.google.com/timedtext?lang=ja&v=" + vid)
+                    with urllib.request.urlopen(req) as response:
+                        XmlData = response.read()
+                        if not XmlData:
+                            log.debug("日本語歌詞なし")
+                            req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                            with urllib.request.urlopen(req_en) as response_en:
+                                XmlData_en = response_en.read()
+                                if XmlData_en:
+                                    log.debug("英語歌詞あり")
+                                    root = ET.fromstring(XmlData_en)
+                                    Lyrics_type = "英語"
+                                    for transcript in root:
+                                        message_lyrics = message_lyrics + "\n" + transcript.text
+                                else:
+                                    log.debug("英語歌詞なし")
+                        else:
+                            log.debug("日本語歌詞あり")
+                            root = ET.fromstring(XmlData)
+                            Lyrics_type = "日本語"
+                            for transcript in root:
+                                message_lyrics = message_lyrics + "\n" + transcript.text
+                except urllib.error.HTTPError:
+                    log.debug("日本語歌詞なし")
+                    try:
+                        req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                        with urllib.request.urlopen(req_en) as response_en:
+                            XmlData_en = response_en.read()
+                            if XmlData_en:
+                                log.debug("英語歌詞あり")
+                                root = ET.fromstring(XmlData_en)
+                                Lyrics_type = "英語"
+                                for transcript in root:
+                                    message_lyrics = message_lyrics + "\n" + transcript.text
+                            else:
+                                log.debug("英語歌詞なし")
+                    except urllib.error.HTTPError:
+                        log.debug("英語歌詞なし")
+
+                if message_lyrics != "":
+                    # log.debug("Lyrics: %s", message_lyrics)
+                    channel = entry.meta.get('channel', None)
+                    if len(message_lyrics) >= 1900:
+                        await self.safe_send_message(channel, "__**`" + entry.title + "`歌詞字幕 (" + Lyrics_type + ")**__\n```" + message_lyrics[:1900] + "... (略)```")
+                    else:
+                        await self.safe_send_message(channel, "__**`" + entry.title + "`歌詞字幕 (" + Lyrics_type + ")**__\n```" + message_lyrics + "```")
+
+            if urllib.parse.urlparse(song_url).netloc == "youtu.be":
+                log.debug("NETLOC: youtu.be")
+                vid = urllib.parse.urlparse(song_url).path
+                log.debug("VID: " + vid)
+
+                message_lyrics = ""
+                Lyrics_type = ""
+
+                try:
+                    req = urllib.request.Request("http://video.google.com/timedtext?lang=ja&v=" + vid)
+                    with urllib.request.urlopen(req) as response:
+                        XmlData = response.read()
+                        if not XmlData:
+                            log.debug("日本語歌詞なし")
+                            req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                            with urllib.request.urlopen(req_en) as response_en:
+                                XmlData_en = response_en.read()
+                                if XmlData_en:
+                                    log.debug("英語歌詞あり")
+                                    root = ET.fromstring(XmlData_en)
+                                    Lyrics_type = "英語"
+                                    for transcript in root:
+                                        message_lyrics = message_lyrics + "\n" + transcript.text
+                                else:
+                                    log.debug("英語歌詞なし")
+                        else:
+                            log.debug("日本語歌詞あり")
+                            root = ET.fromstring(XmlData)
+                            Lyrics_type = "日本語"
+                            for transcript in root:
+                                message_lyrics = message_lyrics + "\n" + transcript.text
+                except urllib.error.HTTPError:
+                    log.debug("日本語歌詞なし")
+                    try:
+                        req_en = urllib.request.Request("http://video.google.com/timedtext?lang=en&v=" + vid)
+                        with urllib.request.urlopen(req_en) as response_en:
+                            XmlData_en = response_en.read()
+                            if XmlData_en:
+                                log.debug("英語歌詞あり")
+                                root = ET.fromstring(XmlData_en)
+                                Lyrics_type = "英語"
+                                for transcript in root:
+                                    message_lyrics = message_lyrics + "\n" + transcript.text
+                            else:
+                                log.debug("英語歌詞なし")
+                    except urllib.error.HTTPError:
+                        log.debug("英語歌詞なし")
+
+                if message_lyrics != "":
+                    # log.debug("Lyrics: %s", message_lyrics)
+                    channel = entry.meta.get('channel', None)
+                    await self.safe_send_message(channel, "__**`" + entry.title + "`歌詞字幕 (" + Lyrics_type + ")**__\n```" + message_lyrics + "```")
+            else:
+                return Response(
+                    self.str.get('cmd-lyrics-none', 'There are no songs queued! Queue something with {0}play.') .format(self.config.command_prefix),
+                    delete_after=30
+                )
+        return
+        
     @dev_only
     async def cmd_breakpoint(self, message):
         log.critical("Activating debug breakpoint")
